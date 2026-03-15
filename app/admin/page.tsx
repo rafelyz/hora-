@@ -1,12 +1,12 @@
 "use client"
 
-import dynamic from 'next/dynamic'
+import NextDynamic from 'next/dynamic'
 import { AuthGuard } from '@/components/auth-guard'
 import { Navigation } from '@/components/navigation'
 
 export const dynamic = 'force-dynamic'
 
-const AdminDashboard = dynamic(() => import('@/components/admin-dashboard').then(mod => ({ default: mod.AdminDashboard })), {
+const AdminDashboard = NextDynamic(() => import('@/components/admin-dashboard').then(mod => ({ default: mod.AdminDashboard })), {
   ssr: false,
   loading: () => <div className="flex items-center justify-center min-h-screen">Loading...</div>
 })
