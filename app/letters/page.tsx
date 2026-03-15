@@ -15,7 +15,7 @@ export default function LettersPage() {
               Love Letters
             </h1>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Words from my heart to yours
+              Words from my heart to yours!
             </p>
             <div className="w-24 h-0.5 bg-gradient-to-r from-transparent via-gold to-transparent mx-auto mt-6" />
           </header>
