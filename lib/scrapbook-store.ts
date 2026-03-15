@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+
 export interface Photo {
   id: string
   src: string
@@ -14,80 +15,118 @@ export interface Letter {
   date: string
 }
 
-const PHOTOS_KEY = 'scrapbook-photos'
-const LETTERS_KEY = 'scrapbook-letters'
+// --- PHOTOS FUNCTIONS ---
 
-// Default demo content
-const defaultPhotos: Photo[] = []
+export async function uploadPhotoFile(file: File, photoId: string): Promise<string> {
+  const fileName = `${photoId}-${Date.now()}.${file.name.split('.').pop()}`
+  
+  const { data, error } = await supabase.storage
+    .from('photos')
+    .upload(`memories/${fileName}`, file, {
+      cacheControl: '3600',
+      upsert: false
+    })
 
-const defaultLetters: Letter[] = [
-  {
-    id: '1',
-    title: 'The Day We Met',
-    content: `My Dearest,
-
-From the moment our eyes met, I knew my life would never be the same. There was something in your smile that felt like coming home, like finding a missing piece of my soul I never knew was lost.
-
-Every day since then has been a beautiful adventure. You've taught me what it means to truly love and be loved in return.
-
-Forever yours,
-Your Love`,
-    date: '2024-01-15'
+  if (error) {
+    console.error('Error uploading photo file:', error.message)
+    throw error
   }
-]
 
-export function getPhotos(): Photo[] {
-  if (typeof window === 'undefined') return defaultPhotos
-  const stored = localStorage.getItem(PHOTOS_KEY)
-  if (!stored) {
-    localStorage.setItem(PHOTOS_KEY, JSON.stringify(defaultPhotos))
-    return defaultPhotos
-  }
-  return JSON.parse(stored)
+  // Get the public URL
+  const { data: publicData } = supabase.storage
+    .from('photos')
+    .getPublicUrl(`memories/${fileName}`)
+
+  return publicData.publicUrl
 }
 
+export async function getPhotos(): Promise<Photo[]> {
+  const { data, error } = await supabase
+    .from('photos')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching photos:', error.message)
+    return []
+  }
+  return data || []
+}
 
 export async function savePhoto(photo: Photo) {
   const { data, error } = await supabase
-    .from('photos') 
+    .from('photos')
     .insert([photo])
 
   if (error) {
-    console.error('Error saving to Supabase:', error.message)
+    console.error('Error saving photo:', error.message)
     throw error
   }
   return data
 }
 
-export function deletePhoto(id: string): void {
-  const photos = getPhotos().filter(p => p.id !== id)
-  localStorage.setItem(PHOTOS_KEY, JSON.stringify(photos))
-}
+export async function deletePhoto(id: string) {
+  const { error } = await supabase
+    .from('photos')
+    .delete()
+    .eq('id', id)
 
-export function getLetters(): Letter[] {
-  if (typeof window === 'undefined') return defaultLetters
-  const stored = localStorage.getItem(LETTERS_KEY)
-  if (!stored) {
-    localStorage.setItem(LETTERS_KEY, JSON.stringify(defaultLetters))
-    return defaultLetters
+  if (error) {
+    console.error('Error deleting photo:', error.message)
+    throw error
   }
-  return JSON.parse(stored)
 }
 
-export function saveLetter(letter: Letter): void {
-  const letters = getLetters()
-  letters.push(letter)
-  localStorage.setItem(LETTERS_KEY, JSON.stringify(letters))
+// --- LETTERS FUNCTIONS ---
+
+export async function getLetters(): Promise<Letter[]> {
+  const { data, error } = await supabase
+    .from('letters')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching letters:', error.message)
+    return []
+  }
+  return data || []
 }
 
-export function updateLetter(letter: Letter): void {
-  const letters = getLetters().map(l => l.id === letter.id ? letter : l)
-  localStorage.setItem(LETTERS_KEY, JSON.stringify(letters))
+export async function saveLetter(letter: Letter) {
+  const { data, error } = await supabase
+    .from('letters')
+    .insert([letter])
+
+  if (error) {
+    console.error('Error saving letter:', error.message)
+    throw error
+  }
+  return data
 }
 
-export function deleteLetter(id: string): void {
-  const letters = getLetters().filter(l => l.id !== id)
-  localStorage.setItem(LETTERS_KEY, JSON.stringify(letters))
+export async function updateLetter(letter: Letter) {
+  const { data, error } = await supabase
+    .from('letters')
+    .update({ title: letter.title, content: letter.content, date: letter.date })
+    .eq('id', letter.id)
+
+  if (error) {
+    console.error('Error updating letter:', error.message)
+    throw error
+  }
+  return data
+}
+
+export async function deleteLetter(id: string) {
+  const { error } = await supabase
+    .from('letters')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    console.error('Error deleting letter:', error.message)
+    throw error
+  }
 }
 
 export function generateId(): string {

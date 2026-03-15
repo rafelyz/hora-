@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { 
-  getPhotos, savePhoto, deletePhoto, 
+  getPhotos, savePhoto, deletePhoto, uploadPhotoFile,
   getLetters, saveLetter, deleteLetter,
   generateId,
   type Photo, type Letter 
@@ -83,6 +83,12 @@ export function AdminDashboard() {
     setError('')
 
     try {
+      const photoId = generateId()
+      
+      // First, upload the file to Supabase Storage
+      const fileUrl = await uploadPhotoFile(selectedFile, photoId)
+      
+      // Get image dimensions for aspect ratio
       const reader = new FileReader()
       reader.readAsDataURL(selectedFile)
       
@@ -94,17 +100,18 @@ export function AdminDashboard() {
         img.onload = async () => {
           const aspectRatio = getAspectRatio(img.width, img.height)
           
+          // Create photo object with storage URL instead of base64
           const newPhoto: Photo = {
-            id: generateId(),
-            src: base64data,
+            id: photoId,
+            src: fileUrl,  // Store the public URL from storage
             caption: photoCaption || undefined,
             date: photoDate || undefined,
             aspectRatio
           }
           
           try {
-            await savePhoto(newPhoto) // Wait for Supabase
-            const updatedPhotos = await getPhotos() // Get fresh list
+            await savePhoto(newPhoto)
+            const updatedPhotos = await getPhotos()
             setPhotos(updatedPhotos)
             resetPhotoForm()
           } catch (err) {
@@ -115,7 +122,7 @@ export function AdminDashboard() {
         }
       }
     } catch (err) {
-      setError('Failed to process image')
+      setError('Failed to upload image file')
       setIsSaving(false)
     }
   }
