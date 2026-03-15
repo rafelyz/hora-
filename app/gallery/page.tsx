@@ -4,6 +4,8 @@ import { AuthGuard } from '@/components/auth-guard'
 import { Navigation } from '@/components/navigation'
 import { PhotoGallery } from '@/components/photo-gallery'
 
+export const dynamic = 'force-dynamic'
+
 export default function GalleryPage() {
   return (
     <AuthGuard>

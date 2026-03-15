@@ -4,6 +4,8 @@ import { AuthGuard } from '@/components/auth-guard'
 import { Navigation } from '@/components/navigation'
 import { LoveLetters } from '@/components/love-letters'
 
+export const dynamic = 'force-dynamic'
+
 export default function LettersPage() {
   return (
     <AuthGuard>
