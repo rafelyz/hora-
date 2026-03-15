@@ -1,3 +1,4 @@
+import { supabase } from './supabase'
 export interface Photo {
   id: string
   src: string
@@ -45,13 +46,17 @@ export function getPhotos(): Photo[] {
   return JSON.parse(stored)
 }
 
-export function savePhoto(photo: Photo): void {
-  const photos = getPhotos()
-  if (photos.length >= 100) {
-    throw new Error('Maximum 100 photos allowed')
+
+export async function savePhoto(photo: Photo) {
+  const { data, error } = await supabase
+    .from('photos') 
+    .insert([photo])
+
+  if (error) {
+    console.error('Error saving to Supabase:', error.message)
+    throw error
   }
-  photos.push(photo)
-  localStorage.setItem(PHOTOS_KEY, JSON.stringify(photos))
+  return data
 }
 
 export function deletePhoto(id: string): void {
