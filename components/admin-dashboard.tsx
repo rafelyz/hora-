@@ -10,7 +10,7 @@ import {
 } from '@/lib/scrapbook-store'
 import { 
   Plus, Upload, Trash2, Images, Mail, X, 
-  Camera, Feather, AlertCircle 
+  Camera, Feather, AlertCircle, Loader2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,6 +22,7 @@ export function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<Tab>('photos')
   const [photos, setPhotos] = useState<Photo[]>([])
   const [letters, setLetters] = useState<Letter[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   
   // Photo form state
   const [showPhotoForm, setShowPhotoForm] = useState(false)
@@ -29,6 +30,7 @@ export function AdminDashboard() {
   const [photoDate, setPhotoDate] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   
   // Letter form state
@@ -39,12 +41,21 @@ export function AdminDashboard() {
   
   const [error, setError] = useState('')
 
+  // Load data from Supabase on mount
   useEffect(() => {
-    setPhotos(getPhotos())
-    setLetters(getLetters())
+    async function loadData() {
+      setIsLoading(true)
+      const [fetchedPhotos, fetchedLetters] = await Promise.all([
+        getPhotos(),
+        getLetters()
+      ])
+      setPhotos(fetchedPhotos)
+      setLetters(fetchedLetters)
+      setIsLoading(false)
+    }
+    loadData()
   }, [])
 
-  // Handle file selection
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
@@ -54,7 +65,6 @@ export function AdminDashboard() {
     }
   }
 
-  // Determine aspect ratio from image
   const getAspectRatio = (width: number, height: number): Photo['aspectRatio'] => {
     const ratio = width / height
     if (ratio > 1.2) return 'landscape'
@@ -62,44 +72,51 @@ export function AdminDashboard() {
     return 'square'
   }
 
-  // Save new photo
+  // Handle Save Photo with Supabase
   const handleSavePhoto = async () => {
     if (!selectedFile || !previewUrl) {
       setError('Please select an image')
       return
     }
 
-    if (photos.length >= 100) {
-      setError('Maximum 100 photos reached')
-      return
-    }
+    setIsSaving(true)
+    setError('')
 
     try {
-      // Convert to base64 for localStorage
       const reader = new FileReader()
-      reader.onloadend = () => {
+      reader.readAsDataURL(selectedFile)
+      
+      reader.onloadend = async () => {
+        const base64data = reader.result as string
         const img = new window.Image()
-        img.crossOrigin = "anonymous"
-        img.onload = () => {
+        img.src = base64data
+        
+        img.onload = async () => {
           const aspectRatio = getAspectRatio(img.width, img.height)
           
           const newPhoto: Photo = {
             id: generateId(),
-            src: reader.result as string,
+            src: base64data,
             caption: photoCaption || undefined,
             date: photoDate || undefined,
             aspectRatio
           }
           
-          savePhoto(newPhoto)
-          setPhotos(getPhotos())
-          resetPhotoForm()
+          try {
+            await savePhoto(newPhoto) // Wait for Supabase
+            const updatedPhotos = await getPhotos() // Get fresh list
+            setPhotos(updatedPhotos)
+            resetPhotoForm()
+          } catch (err) {
+            setError('Failed to save to Database')
+          } finally {
+            setIsSaving(false)
+          }
         }
-        img.src = reader.result as string
       }
-      reader.readAsDataURL(selectedFile)
-    } catch {
-      setError('Failed to save photo')
+    } catch (err) {
+      setError('Failed to process image')
+      setIsSaving(false)
     }
   }
 
@@ -110,32 +127,45 @@ export function AdminDashboard() {
     setPhotoCaption('')
     setPhotoDate('')
     setError('')
+    setIsSaving(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  // Delete photo
-  const handleDeletePhoto = (id: string) => {
-    deletePhoto(id)
-    setPhotos(getPhotos())
+  const handleDeletePhoto = async (id: string) => {
+    try {
+      await deletePhoto(id)
+      const updated = await getPhotos()
+      setPhotos(updated)
+    } catch (err) {
+      console.error(err)
+    }
   }
 
-  // Save new letter
-  const handleSaveLetter = () => {
+  // Handle Save Letter with Supabase
+  const handleSaveLetter = async () => {
     if (!letterTitle.trim() || !letterContent.trim()) {
       setError('Please fill in all fields')
       return
     }
 
-    const newLetter: Letter = {
-      id: generateId(),
-      title: letterTitle,
-      content: letterContent,
-      date: letterDate
-    }
+    setIsSaving(true)
+    try {
+      const newLetter: Letter = {
+        id: generateId(),
+        title: letterTitle,
+        content: letterContent,
+        date: letterDate
+      }
 
-    saveLetter(newLetter)
-    setLetters(getLetters())
-    resetLetterForm()
+      await saveLetter(newLetter)
+      const updated = await getLetters()
+      setLetters(updated)
+      resetLetterForm()
+    } catch (err) {
+      setError('Failed to save letter')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const resetLetterForm = () => {
@@ -144,12 +174,26 @@ export function AdminDashboard() {
     setLetterContent('')
     setLetterDate(new Date().toISOString().split('T')[0])
     setError('')
+    setIsSaving(false)
   }
 
-  // Delete letter
-  const handleDeleteLetter = (id: string) => {
-    deleteLetter(id)
-    setLetters(getLetters())
+  const handleDeleteLetter = async (id: string) => {
+    try {
+      await deleteLetter(id)
+      const updated = await getLetters()
+      setLetters(updated)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <Loader2 className="w-8 h-8 animate-spin text-sage" />
+        <p className="text-muted-foreground font-medium">Connecting to memories...</p>
+      </div>
+    )
   }
 
   return (
@@ -185,7 +229,6 @@ export function AdminDashboard() {
       {/* Photos Tab */}
       {activeTab === 'photos' && (
         <div>
-          {/* Add Photo Button */}
           {!showPhotoForm && photos.length < 100 && (
             <div className="flex justify-center mb-8">
               <Button
@@ -198,7 +241,6 @@ export function AdminDashboard() {
             </div>
           )}
 
-          {/* Add Photo Form */}
           {showPhotoForm && (
             <div className="parchment-bg rounded-xl p-6 md:p-8 mb-8 border border-gold/20 animate-fade-in-scale">
               <div className="flex items-center justify-between mb-6">
@@ -212,7 +254,6 @@ export function AdminDashboard() {
               </div>
 
               <div className="grid md:grid-cols-2 gap-6">
-                {/* Upload Area */}
                 <div>
                   <input
                     ref={fileInputRef}
@@ -253,7 +294,6 @@ export function AdminDashboard() {
                   )}
                 </div>
 
-                {/* Form Fields */}
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
@@ -289,10 +329,10 @@ export function AdminDashboard() {
                   <div className="flex gap-3 pt-4">
                     <Button
                       onClick={handleSavePhoto}
-                      disabled={!selectedFile}
+                      disabled={!selectedFile || isSaving}
                       className="flex-1 bg-sage hover:bg-sage/90 text-primary-foreground"
                     >
-                      Save Photo
+                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Photo'}
                     </Button>
                     <Button
                       onClick={resetPhotoForm}
@@ -307,16 +347,13 @@ export function AdminDashboard() {
             </div>
           )}
 
-          {/* Photos Grid */}
           {photos.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {photos.map((photo) => (
                 <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-gold/10">
-                  <Image
+                  <img
                     src={photo.src}
                     alt={photo.caption || 'Photo'}
-                    width={200}
-                    height={200}
                     className="w-full h-40 object-cover"
                   />
                   <div className="absolute inset-0 bg-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -347,7 +384,6 @@ export function AdminDashboard() {
       {/* Letters Tab */}
       {activeTab === 'letters' && (
         <div>
-          {/* Add Letter Button */}
           {!showLetterForm && (
             <div className="flex justify-center mb-8">
               <Button
@@ -360,7 +396,6 @@ export function AdminDashboard() {
             </div>
           )}
 
-          {/* Add Letter Form */}
           {showLetterForm && (
             <div className="parchment-bg rounded-xl p-6 md:p-8 mb-8 border border-gold/20 animate-fade-in-scale">
               <div className="flex items-center justify-between mb-6">
@@ -422,9 +457,10 @@ export function AdminDashboard() {
                 <div className="flex gap-3 pt-2">
                   <Button
                     onClick={handleSaveLetter}
+                    disabled={isSaving}
                     className="flex-1 bg-sage hover:bg-sage/90 text-primary-foreground"
                   >
-                    Save Letter
+                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Letter'}
                   </Button>
                   <Button
                     onClick={resetLetterForm}
@@ -438,7 +474,6 @@ export function AdminDashboard() {
             </div>
           )}
 
-          {/* Letters List */}
           {letters.length > 0 ? (
             <div className="space-y-4">
               {letters.map((letter) => (
@@ -473,6 +508,7 @@ export function AdminDashboard() {
 }
 
 function formatDate(dateStr: string): string {
+  if (!dateStr) return ''
   const date = new Date(dateStr)
   return date.toLocaleDateString('en-US', { 
     month: 'long', 
