@@ -10,7 +10,7 @@ export function LoveLetters() {
   const [selectedLetter, setSelectedLetter] = useState<Letter | null>(null)
 
   useEffect(() => {
-    setLetters(getLetters())
+    getLetters().then(setLetters)
   }, [])
 
   if (letters.length === 0) {
