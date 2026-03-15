@@ -1,7 +1,15 @@
 import { createClient } from '@supabase/supabase-js'
 
-// looks for the keys you put inside .env.local file
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+let supabaseInstance: ReturnType<typeof createClient> | null = null
+
+export function getSupabase() {
+  if (!supabaseInstance && supabaseUrl && supabaseAnonKey) {
+    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey)
+  }
+  return supabaseInstance
+}
+
+export const supabase = getSupabase() || createClient(supabaseUrl, supabaseAnonKey)

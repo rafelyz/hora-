@@ -4,6 +4,8 @@ import { AuthGuard } from '@/components/auth-guard'
 import { Navigation } from '@/components/navigation'
 import { AdminDashboard } from '@/components/admin-dashboard'
 
+export const dynamic = 'force-dynamic'
+
 export default function AdminPage() {
   return (
     <AuthGuard requireAdmin>
