@@ -12,7 +12,7 @@ export function PhotoGallery() {
   const [loaded, setLoaded] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    setPhotos(getPhotos())
+    getPhotos().then(setPhotos)
   }, [])
 
   const handleImageLoad = (id: string) => {
